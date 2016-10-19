@@ -1,0 +1,20 @@
+PROJNAME=student01
+
+HEADERS = #dthree.h dgasdevrand.h
+OBJS    = $(PROJNAME).o
+LIBS    = -lm
+INCLUDE = -I${HOME}/headerfiles
+
+
+
+CC=gcc
+CFLAGS=-c -Wall -ffast-math -O3
+SOURCES=student01.c 
+OBJECTS=$(SOURCES:.c=.o)
+EXECUTABLE=student01
+
+#all: $(SOURCES) $(EXECUTABLE)
+    
+$(PROJNAME): $(OBJS) $(HEADERS)
+	$(CC) -o $(PROJNAME) $(OBJS) ${INCLUDE} $(CFLAGS) $(LIBS)
+
