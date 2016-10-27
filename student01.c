@@ -731,28 +731,35 @@ signal(SIGINT, catch_int);
 //start change02
   
     cmass=0;
-	#pragma omp parallel for reduction(+:cmass)
-    for(i=1;i<=Nx;i++){  
-      for(j=1;j<=Ny;j++){	
-	for(k=1;k<=Nz;k++){
-	  cmass = cmass + ph[i][j][k];
+	#pragma omp parallel
+	{
+	#pragma omp for reduction(+:cmass)
+	{
+		for(i=1;i<=Nx;i++){  
+		  for(j=1;j<=Ny;j++){	
+		for(k=1;k<=Nz;k++){
+		  cmass = cmass + ph[i][j][k];
+		}
+		  }
+		}
 	}
-      }
-    }
     printf("%lf %lf %lf\n",dx,dz, dy);
     cmass=cmass*h/(1.0*Nx*Ny*Nz);
     printf("cmass %lf\n",cmass);
       
     temp=0.0;
-	#pragma omp parallel for reduction(+:temp)
-    for(i=1;i<=Nx;i++){
-      for(j=1;j<=Ny;j++){
-	for(k=1;k<=Nz;k++){
-	  fph[i][j][k] = ph[i][j][k]*exp(-100.0*(ph[i][j][k]-numax*6.0/pi/2.0)*(ph[i][j][k]-numax*6.0/pi/2.0));
-	  temp=temp + fph[i][j][k];
+	#pragma omp for reduction(+:temp)
+	{
+		for(i=1;i<=Nx;i++){
+		  for(j=1;j<=Ny;j++){
+		for(k=1;k<=Nz;k++){
+		  fph[i][j][k] = ph[i][j][k]*exp(-100.0*(ph[i][j][k]-numax*6.0/pi/2.0)*(ph[i][j][k]-numax*6.0/pi/2.0));
+		  temp=temp + fph[i][j][k];
+		}
+		  }
+		}
 	}
-      }
-    }
+	}
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
