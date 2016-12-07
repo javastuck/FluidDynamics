@@ -383,8 +383,7 @@ int main(int argc, char **argv) {
   
   int numThreads = 6;
   omp_set_num_threads(numThreads);
-  time_t start, end;
-  start = clock();
+  
   FILE *output1;
   FILE *input;
   char file_name[255],base[255];
@@ -549,7 +548,7 @@ junkvariable=(char *) malloc(1);
   /* starts at n=nstart+1, goes to n=Nf  	*/
 
   //Nf=10000000; number of iterations
-  Nf = 500;
+  Nf = atoi(argv[1]);
   
   nstart=1;
 
@@ -672,7 +671,7 @@ signal(SIGINT, catch_int);
   dx=ggx*h/(1.0*(Nx-1));
 
 //Change01 8/2/2016
-  
+ /*
   #pragma omp parallel
   {
       #pragma omp sections
@@ -694,8 +693,14 @@ signal(SIGINT, catch_int);
 		}
 	  }	
   }
-  
+ */
 //end change01
+for(k=1;k<=Nz;k++){
+	z[k]=dz*(k-1);} 
+for(j=1;j<=Ny;j++){
+	y[j]=dy*(j-1);}
+for(i=1;i<=Nx;i++){
+	x[i]=dx*(i-1);}
 
 
 
@@ -731,10 +736,9 @@ signal(SIGINT, catch_int);
 //start change02
   
     cmass=0;
-	#pragma omp parallel
-	{
-	#pragma omp for reduction(+:cmass)
-	{
+	//#pragma omp parallel
+	//{
+	//#pragma omp for reduction(+:cmass)
 		for(i=1;i<=Nx;i++){  
 		  for(j=1;j<=Ny;j++){	
 		for(k=1;k<=Nz;k++){
@@ -742,14 +746,12 @@ signal(SIGINT, catch_int);
 		}
 		  }
 		}
-	}
     printf("%lf %lf %lf\n",dx,dz, dy);
     cmass=cmass*h/(1.0*Nx*Ny*Nz);
     printf("cmass %lf\n",cmass);
       
     temp=0.0;
-	#pragma omp for reduction(+:temp)
-	{
+	//#pragma omp for reduction(+:temp)
 		for(i=1;i<=Nx;i++){
 		  for(j=1;j<=Ny;j++){
 		for(k=1;k<=Nz;k++){
@@ -758,8 +760,7 @@ signal(SIGINT, catch_int);
 		}
 		  }
 		}
-	}
-	}
+	//}
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -774,7 +775,7 @@ signal(SIGINT, catch_int);
 
 //start change03
   /*use values found above for density, and initialize u,v,w,t*/
-    #pragma omp parallel for shared(u,v,w,T) private(i,j,k)
+    //#pragma omp parallel for shared(u,v,w,T) private(i,j,k)
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1011,7 +1012,7 @@ signal(SIGINT, catch_int);
   
   n=nstart+1;
   //while(checkforsignaltoend==1){
-  for(n=nstart;n<=Nf;n++){
+  for(n=nstart;n<=Nf;++n){
     //n++; 
       /* find plate position */
     
@@ -1022,7 +1023,8 @@ signal(SIGINT, catch_int);
       /*there are physically no particles		*/
 	  
 	//start change07
-	#pragma omp parallel for shared(fu,fv,fw,fT,u,v,w,T) private(i,j,k) num_threads(numThreads)
+	//pragma omp parallel for shared(fu,fv,fw,fT,u,v,w,T) private(i,j,k) num_threads(numThreads)
+      #pragma omp parallel for default(shared) num_threads(numThreads)
       for(i=1;i<=Nx;i++){	
 	for(j=1;j<=Ny;j++){
 	  for(k=2;k<Nz;k++){  
@@ -1044,7 +1046,7 @@ signal(SIGINT, catch_int);
 	
 	}
       }
-
+#pragma omp parallel for default(shared) num_threads(numThreads)
       for(i=1;i<=Nx;i++){      
 	for(k=1;k<=Nz;k++){
 	  for(j=2;j<Ny;j++){
@@ -1064,7 +1066,7 @@ signal(SIGINT, catch_int);
 	  fT[i][Ny][k]=(fT[i][Ny-1][k] + fT[i][Ny][k] + fT[i][1][k])/3.0;
 	}
       }
-
+#pragma omp parallel for default(shared) num_threads(numThreads)
     for(k=1;k<=Nz;k++){
 	for(j=1;j<=Ny;j++){
 	  for(i=2;i<Nx;i++){
@@ -1089,7 +1091,8 @@ signal(SIGINT, catch_int);
     }
 
      
-    #pragma omp parallel for shared(fu,fv,fw,fT,u,v,w,T,ph) private(i,j,k) num_threads(numThreads)
+    //#pragma omp parallel for shared(fu,fv,fw,fT,u,v,w,T,ph) private(i,j,k) num_threads(numThreads)
+    #pragma omp parallel for default(shared) num_threads(numThreads)
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1102,7 +1105,7 @@ signal(SIGINT, catch_int);
       }
     }
 //end change07
-    //printf("%d \n", n);
+    printf("%d \n", n);
 
     /** Make sure T is nonnegative everywhere 	**/
     /** And check for conservation of mass, so	**/
@@ -1112,7 +1115,7 @@ signal(SIGINT, catch_int);
     cmass=0.0;
     tsmooth=0;
 	omp_set_num_threads(numThreads);
-	#pragma omp parallel for reduction(+:tsmooth,cmass) shared(T) private(i,j,k) num_threads(numThreads)
+	#pragma omp parallel for reduction(+:tsmooth,cmass) default(shared) num_threads(numThreads)
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1128,7 +1131,7 @@ signal(SIGINT, catch_int);
     cmass=cmass*h/(1.0*Nx*Ny*Nz);
     
     temp=0.0;
-	#pragma omp parallel for reduction(+:temp) shared(fph,ph) private(i,j,k) num_threads(numThreads)
+	#pragma omp parallel for reduction(+:temp) default(shared) num_threads(numThreads)
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1139,7 +1142,7 @@ signal(SIGINT, catch_int);
 	}
       }
     }
-	#pragma omp parallel for shared(ph,fph) private(i,j,k) num_threads(numThreads)
+	#pragma omp parallel for default(shared) num_threads(numThreads)
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1150,7 +1153,7 @@ signal(SIGINT, catch_int);
     }
 //end change04
 
-    //printf("cmass %lf\n", cmass);
+    printf("cmass %lf\n", cmass);
 
     /** Now set boundary conditions		**/
     for(i=1;i<=Nx;i++){
@@ -1188,7 +1191,7 @@ signal(SIGINT, catch_int);
     /******* Calculate first derivatives of the flow variables ***/
      
     /*First in x */
-      
+    #pragma omp parallel for default(shared)  
     for(k=1;k<=Nz;k++){
       for(j=1;j<=Ny;j++){
 	for(i=2;i<Nx;i++){
@@ -1217,7 +1220,7 @@ signal(SIGINT, catch_int);
     }
     /*Then in y */
 
-     
+    #pragma omp parallel for default(shared)
     for(i=1;i<=Nx;i++){
       for(k=1;k<=Nz;k++){
 	for(j=2;j<Ny;j++){
@@ -1246,6 +1249,7 @@ signal(SIGINT, catch_int);
 	
 
      /* finally in z */
+    #pragma omp parallel for default(shared) 
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){      
 	for(k=2;k<Nz;k++){
@@ -1287,7 +1291,8 @@ signal(SIGINT, catch_int);
     
     /**** Now calculate combinations of the variables and derivatives****/
 //change05
-    #pragma omp parallel for shared(G,P,lam,mu,K,T,gam,divU,stressxx,ux,wz,vy,ph,stressyy,stresszz,stressxy,stressxz,stressyz,heatfluxx,heatfluxy,heatfluxz,vx,uy,wx,uz,wy,vz,Tx,Ty,Tz) private(i,j,k) num_threads(numThreads)
+    //#pragma omp parallel for shared(G,P,lam,mu,K,T,gam,divU,stressxx,ux,wz,vy,ph,stressyy,stresszz,stressxy,stressxz,stressyz,heatfluxx,heatfluxy,heatfluxz,vx,uy,wx,uz,wy,vz,Tx,Ty,Tz) private(i,j,k) num_threads(numThreads)
+    #pragma omp parallel for default(shared) 
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1348,7 +1353,8 @@ signal(SIGINT, catch_int);
     /* and higher order derivatives and combinations */
 //start change06
     /* first x derivatives */
-    #pragma omp parallel for shared(divflux,heatfluxx,stressxxDx,stressxx,stressxz,stressxzDx,stressxy,stressxyDx) private(i,j,k) num_threads(numThreads)
+    //#pragma omp parallel for shared(divflux,heatfluxx,stressxxDx,stressxx,stressxz,stressxzDx,stressxy,stressxyDx) private(i,j,k) num_threads(numThreads)
+    #pragma omp parallel for default(shared)
     for(j=1;j<=Ny;j++){
       for(k=1;k<=Nz;k++){
 	for(i=2;i<Nx;i++){
@@ -1383,7 +1389,8 @@ signal(SIGINT, catch_int);
       }
     }
     /* now y derivatives */
-    #pragma omp parallel for shared(divflux,heatfluxy,stressyyDy,stressyy,stressxy,stressxyDy,stressyz,stressyzDy) private(i,j,k) num_threads(numThreads)
+    //#pragma omp parallel for shared(divflux,heatfluxy,stressyyDy,stressyy,stressxy,stressxyDy,stressyz,stressyzDy) private(i,j,k) num_threads(numThreads)
+    #pragma omp parallel for default(shared)
     for(i=1;i<=Nx;i++){
       for(k=1;k<=Nz;k++){
 	for(j=2;j<Ny;j++){
@@ -1415,7 +1422,8 @@ signal(SIGINT, catch_int);
     }
 
       /* then z derivatives */
-	#pragma omp parallel for shared(divflux,heatfluxz,stresszzDz,stresszz,stressxz,stressxzDz,stressyz,stressyzDz) private(i,j,k) num_threads(numThreads)
+	//#pragma omp parallel for shared(divflux,heatfluxz,stresszzDz,stresszz,stressxz,stressxzDz,stressyz,stressyzDz) private(i,j,k) num_threads(numThreads)
+    #pragma omp parallel for default(shared)
     for(i=1;i<=Nx;i++){    
       for(j=1;j<=Ny;j++){
 	for(k=2;k<Nz;k++){
@@ -1474,7 +1482,8 @@ signal(SIGINT, catch_int);
     
 
     /********* Finally, calculate dph, dv, dw, dT *****************/
-	#pragma omp parallel for shared(dph,u,phx,v,phy,w,phz,ph,divU,dw,wx,wy,wz,Pz,stresszzDz,stressxzDx,stressyzDy,du,ux,uy,uz,Px,stressxxDx,stressxyDy,stressxzDz,dv,vx,vy,vz,Py,stressyyDy,stressxyDx,stressyzDz,dT,Tx,Ty,Tz,P,gam,divflux,stressxx,stressyy,stresszz,stressxy,stressyz,stressxz) private(i,j,k) num_threads(numThreads)
+//	#pragma omp parallel for shared(dph,u,phx,v,phy,w,phz,ph,divU,dw,wx,wy,wz,Pz,stresszzDz,stressxzDx,stressyzDy,du,ux,uy,uz,Px,stressxxDx,stressxyDy,stressxzDz,dv,vx,vy,vz,Py,stressyyDy,stressxyDx,stressyzDz,dT,Tx,Ty,Tz,P,gam,divflux,stressxx,stressyy,stresszz,stressxy,stressyz,stressxz) private(i,j,k) num_threads(numThreads)
+    #pragma omp parallel for default(shared) 
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1534,7 +1543,7 @@ signal(SIGINT, catch_int);
    
     /*    if(n%1000==2){	*/
     
-    //printf("%lf\n",t*f*numsnaps-tsnap); 
+    printf("%lf\n",t*f*numsnaps-tsnap); 
     
     /*if time elapsed since last save is >=1/numsnaps, then save*/
 
@@ -1850,9 +1859,10 @@ signal(SIGINT, catch_int);
 
        
   }
-  end=clock();
-  float tottime=((float)(end-start))/CLOCKS_PER_SEC;
-  printf("Time elapsed: %f",tottime);
+  //time_t end;
+  //end=time(NULL);
+  //double tottime=(double)(end-start);
+  //printf("Time elapsed: %.2f\n",tottime);
 
   printf("freeing memory\n");
        
