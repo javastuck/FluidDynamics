@@ -67,11 +67,12 @@
 #include <signal.h>  
 #include <omp.h>
 #include <time.h>
+#include <math.h>
 /*#include "dthree.h"*/
 /*#include "dgasdevrand.h"*/
 /*#include "dm.h"*/
 
-#define NUM_THREADS 4
+//#define NUM_THREADS 4
 
 /**The following functions create ways to access memory      **/
 /**addresses as arrays rather than doing pointer arithmetic  **/
@@ -330,7 +331,7 @@ int nrl,nrh,ncl,nch;
 /*  This function creates random numbers with a normal distribution */
 /*  And unit variance, just like matlab's randn		            */
 
-#include <math.h>
+
 
 double gasdevrand()
     
@@ -381,8 +382,8 @@ void catch_int(int sig_num)
 int main(int argc, char **argv) {
   /** Input/Output **/
   
-  int numThreads = 6;
-  omp_set_num_threads(numThreads);
+  //int numThreads = 6;
+  //omp_set_num_threads(numThreads);
   
   FILE *output1;
   FILE *input;
@@ -416,7 +417,7 @@ int main(int argc, char **argv) {
     
   /** Iteration variables **/
 
-  double dt,C,s,tau,tmp,cmass,temp,ttmp,t,time,pl,maxdt;
+  double dt,C,s,tau,tmp,cmass,temp,ttmp,t,time,pl,maxdt,tmpcheck;
   double mindt,dtstep, ev, ed,dtone,gamo,onepluse;
   double ***dph,***dw,***dv,***du,***dT;
   int	n,nstart,Nf,i,j,k,m,savecount,numsnaps,tsnap,numsmooth,tsmooth;
@@ -1015,16 +1016,24 @@ for(i=1;i<=Nx;i++){
   for(n=nstart;n<=Nf;++n){
     //n++; 
       /* find plate position */
-    
+      printf("%d \n", n);
       pl=A*(1.0-cos(2.0*pi*time));
     
+    
+    /** Make sure T is nonnegative everywhere 	**/
+    /** And check for conservation of mass, so	**/
+    /** that avg layer deth is mass		**/    
+      cmass=0.0;
+      tsmooth=0;
       /*Use superviscosity for low density regions	*/
       /*Smooth to prevent blowups in regions where */
       /*there are physically no particles		*/
 	  
 	//start change07
 	//pragma omp parallel for shared(fu,fv,fw,fT,u,v,w,T) private(i,j,k) num_threads(numThreads)
-      #pragma omp parallel for default(shared) num_threads(numThreads)
+      #pragma omp parallel private(temp)
+      {
+      #pragma omp for
       for(i=1;i<=Nx;i++){	
 	for(j=1;j<=Ny;j++){
 	  for(k=2;k<Nz;k++){  
@@ -1046,7 +1055,7 @@ for(i=1;i<=Nx;i++){
 	
 	}
       }
-#pragma omp parallel for default(shared) num_threads(numThreads)
+      #pragma omp for
       for(i=1;i<=Nx;i++){      
 	for(k=1;k<=Nz;k++){
 	  for(j=2;j<Ny;j++){
@@ -1066,7 +1075,7 @@ for(i=1;i<=Nx;i++){
 	  fT[i][Ny][k]=(fT[i][Ny-1][k] + fT[i][Ny][k] + fT[i][1][k])/3.0;
 	}
       }
-#pragma omp parallel for default(shared) num_threads(numThreads)
+    #pragma omp for
     for(k=1;k<=Nz;k++){
 	for(j=1;j<=Ny;j++){
 	  for(i=2;i<Nx;i++){
@@ -1092,7 +1101,7 @@ for(i=1;i<=Nx;i++){
 
      
     //#pragma omp parallel for shared(fu,fv,fw,fT,u,v,w,T,ph) private(i,j,k) num_threads(numThreads)
-    #pragma omp parallel for default(shared) num_threads(numThreads)
+    #pragma omp for
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1104,18 +1113,9 @@ for(i=1;i<=Nx;i++){
 	}
       }
     }
-//end change07
-    printf("%d \n", n);
+      
 
-    /** Make sure T is nonnegative everywhere 	**/
-    /** And check for conservation of mass, so	**/
-    /** that avg layer deth is mass		**/
-    
-//change04      
-    cmass=0.0;
-    tsmooth=0;
-	omp_set_num_threads(numThreads);
-	#pragma omp parallel for reduction(+:tsmooth,cmass) default(shared) num_threads(numThreads)
+    #pragma omp for reduction(+:tsmooth,cmass)
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1128,10 +1128,19 @@ for(i=1;i<=Nx;i++){
 	}
       }
     }
+
+}
+    //come back to this so that this can be parallelized
     cmass=cmass*h/(1.0*Nx*Ny*Nz);
+    printf("cmass %lf\n", cmass);
     
     temp=0.0;
-	#pragma omp parallel for reduction(+:temp) default(shared) num_threads(numThreads)
+
+
+#pragma omp parallel default(shared) private(nu,tone,ev,ed) //had difficulty here due to the shared variables
+{
+    printf("threadmass %lf\n",cmass);
+    #pragma omp for reduction(+:temp)
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1142,7 +1151,8 @@ for(i=1;i<=Nx;i++){
 	}
       }
     }
-	#pragma omp parallel for default(shared) num_threads(numThreads)
+
+    #pragma omp for
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1151,11 +1161,14 @@ for(i=1;i<=Nx;i++){
 	}
       }
     }
-//end change04
 
-    printf("cmass %lf\n", cmass);
+
+
+
+
 
     /** Now set boundary conditions		**/
+    #pragma omp for 
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	w[i][j][1]=0.0;			/* impenetrable walls 	*/
@@ -1184,14 +1197,15 @@ for(i=1;i<=Nx;i++){
 	T[i][j][Nz]=0.0;}
       }
     }
-    
+
 
     /*******  Now calculate variables for iteration of equations ****/
 
     /******* Calculate first derivatives of the flow variables ***/
-     
+
+
     /*First in x */
-    #pragma omp parallel for default(shared)  
+    #pragma omp for  
     for(k=1;k<=Nz;k++){
       for(j=1;j<=Ny;j++){
 	for(i=2;i<Nx;i++){
@@ -1218,9 +1232,11 @@ for(i=1;i<=Nx;i++){
       }
 
     }
+    
+
     /*Then in y */
 
-    #pragma omp parallel for default(shared)
+    #pragma omp for
     for(i=1;i<=Nx;i++){
       for(k=1;k<=Nz;k++){
 	for(j=2;j<Ny;j++){
@@ -1249,7 +1265,7 @@ for(i=1;i<=Nx;i++){
 	
 
      /* finally in z */
-    #pragma omp parallel for default(shared) 
+    #pragma omp for 
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){      
 	for(k=2;k<Nz;k++){
@@ -1287,12 +1303,10 @@ for(i=1;i<=Nx;i++){
       }
     }
 
-
     
     /**** Now calculate combinations of the variables and derivatives****/
-//change05
-    //#pragma omp parallel for shared(G,P,lam,mu,K,T,gam,divU,stressxx,ux,wz,vy,ph,stressyy,stresszz,stressxy,stressxz,stressyz,heatfluxx,heatfluxy,heatfluxz,vx,uy,wx,uz,wy,vz,Tx,Ty,Tz) private(i,j,k) num_threads(numThreads)
-    #pragma omp parallel for default(shared) 
+
+    #pragma omp for 
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1347,14 +1361,15 @@ for(i=1;i<=Nx;i++){
 	}
       }
     }
+  
 //end change05
   
  
     /* and higher order derivatives and combinations */
 //start change06
     /* first x derivatives */
-    //#pragma omp parallel for shared(divflux,heatfluxx,stressxxDx,stressxx,stressxz,stressxzDx,stressxy,stressxyDx) private(i,j,k) num_threads(numThreads)
-    #pragma omp parallel for default(shared)
+
+    #pragma omp for
     for(j=1;j<=Ny;j++){
       for(k=1;k<=Nz;k++){
 	for(i=2;i<Nx;i++){
@@ -1367,7 +1382,6 @@ for(i=1;i<=Nx;i++){
 	  stressxyDx[i][j][k]=(stressxy[i+1][j][k]-
 			   stressxy[i-1][j][k])/(2.0*dx);
 	}
-//end change06
 	divflux[1][j][k]=(heatfluxx[2][j][k] -
 			    heatfluxx[Nx][j][k])/(2.0*dx);
 	stressxxDx[1][j][k]=(stressxx[2][j][k] -
@@ -1388,9 +1402,10 @@ for(i=1;i<=Nx;i++){
 	
       }
     }
+
     /* now y derivatives */
-    //#pragma omp parallel for shared(divflux,heatfluxy,stressyyDy,stressyy,stressxy,stressxyDy,stressyz,stressyzDy) private(i,j,k) num_threads(numThreads)
-    #pragma omp parallel for default(shared)
+    
+    #pragma omp for
     for(i=1;i<=Nx;i++){
       for(k=1;k<=Nz;k++){
 	for(j=2;j<Ny;j++){
@@ -1422,8 +1437,8 @@ for(i=1;i<=Nx;i++){
     }
 
       /* then z derivatives */
-	//#pragma omp parallel for shared(divflux,heatfluxz,stresszzDz,stresszz,stressxz,stressxzDz,stressyz,stressyzDz) private(i,j,k) num_threads(numThreads)
-    #pragma omp parallel for default(shared)
+	
+    #pragma omp for
     for(i=1;i<=Nx;i++){    
       for(j=1;j<=Ny;j++){
 	for(k=2;k<Nz;k++){
@@ -1479,11 +1494,11 @@ for(i=1;i<=Nx;i++){
 
       }
     }
-    
+
 
     /********* Finally, calculate dph, dv, dw, dT *****************/
 //	#pragma omp parallel for shared(dph,u,phx,v,phy,w,phz,ph,divU,dw,wx,wy,wz,Pz,stresszzDz,stressxzDx,stressyzDy,du,ux,uy,uz,Px,stressxxDx,stressxyDy,stressxzDz,dv,vx,vy,vz,Py,stressyyDy,stressxyDx,stressyzDz,dT,Tx,Ty,Tz,P,gam,divflux,stressxx,stressyy,stresszz,stressxy,stressyz,stressxz) private(i,j,k) num_threads(numThreads)
-    #pragma omp parallel for default(shared) 
+    #pragma omp for
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1537,7 +1552,8 @@ for(i=1;i<=Nx;i++){
 	}
       }
     }
-
+}
+//}
     
       /* Write data to file */
    
@@ -1785,21 +1801,27 @@ for(i=1;i<=Nx;i++){
     }
     
     tmp=0.0;
+    tmpcheck=0.0;
+    //#pragma omp parallel private(dtone,dt) //try to parallelize later
+    
+    //#pragma omp for reduction(max:tmp)     
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
-	  if(K[i][j][k]/ph[i][j][k]>tmp){
-	    tmp=K[i][j][k]/ph[i][j][k];}
-	  if(lam[i][j][k]/ph[i][j][k]>tmp){
-	    tmp=lam[i][j][k]/ph[i][j][k];}
-	  if(mu[i][j][k]/ph[i][j][k]>tmp){
-	    tmp=mu[i][j][k]/ph[i][j][k];}
+        tmpcheck=ph[i][j][k];
+	  if(K[i][j][k]/tmpcheck>tmp){
+	    tmp=K[i][j][k]/tmpcheck;}
+	  if(lam[i][j][k]/tmpcheck>tmp){
+	    tmp=lam[i][j][k]/tmpcheck;}
+	  if(mu[i][j][k]/tmpcheck>tmp){
+	    tmp=mu[i][j][k]/tmpcheck;}
 	}
       }
     }
     dtone=s * temp * temp / tmp;
 
     tmp=0.0;
+    //#pragma omp for reduction(max:tmp)
     for(i=1;i<=Nx;i++){
       for(j=1;j<=Ny;j++){
 	for(k=1;k<=Nz;k++){
@@ -1817,6 +1839,7 @@ for(i=1;i<=Nx;i++){
        dtone=C*temp/tmp;}
 
      tmp=0.0;
+     //#pragma omp for reduction(max:tmp)
      for(i=1;i<=Nx;i++){
        for(j=1;j<=Ny;j++){
 	 for(k=1;k<=Nz;k++){
@@ -1839,7 +1862,7 @@ for(i=1;i<=Nx;i++){
 
        if(dt>maxdt){
 	 dt=maxdt;}
-       
+       //#pragma omp for
        for(i=1;i<=Nx;i++){
 	 for(j=1;j<=Ny;j++){
 	   for(k=1;k<=Nz;k++){
@@ -1853,6 +1876,7 @@ for(i=1;i<=Nx;i++){
 	   }	
 	 }
        }
+    
        t=t+dt;
        time=t*f;
     /*********************END TIMESTEPPING ****************/
