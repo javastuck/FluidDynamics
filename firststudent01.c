@@ -65,14 +65,11 @@
 #include <malloc.h>
 #include <string.h>
 #include <signal.h>  
-#include <omp.h>
-#include <time.h>
-#include <math.h>
 /*#include "dthree.h"*/
 /*#include "dgasdevrand.h"*/
 /*#include "dm.h"*/
 
-//#define NUM_THREADS 4
+
 
 /**The following functions create ways to access memory      **/
 /**addresses as arrays rather than doing pointer arithmetic  **/
@@ -133,7 +130,7 @@ int nrl,nrh,ncl,nch;
 	if (!m) nrerror("allocation failure 1 in matrix()");
 	m -= nrl;
 
-	for(i=nrl;i<=nrh;++i) {
+	for(i=nrl;i<=nrh;i++) {
 		m[i]=(double *) malloc((unsigned) (nch-ncl+1)*sizeof(double));
 		if (!m[i]) nrerror("allocation failure 2 in matrix()");
 		m[i] -= ncl;
@@ -151,7 +148,7 @@ int nrl,nrh,ncl,nch;
 	if (!m) nrerror("allocation failure 1 in dmatrix()");
 	m -= nrl;
 
-	for(i=nrl;i<=nrh;++i) {
+	for(i=nrl;i<=nrh;i++) {
 		m[i]=(double *) malloc((unsigned) (nch-ncl+1)*sizeof(double));
 		if (!m[i]) nrerror("allocation failure 2 in dmatrix()");
 		m[i] -= ncl;
@@ -171,14 +168,14 @@ double ***dthreearray(nrl,nrh,ncl,nch,nthreel,nthreeh)
   if (!a) nrerror("allocation failure 1 in dmatrix()");
   a -= nrl;
 
-  for(i=nrl;i<=nrh;++i) {
+  for(i=nrl;i<=nrh;i++) {
     a[i]=(double **) malloc((unsigned) (nch-ncl+1)*sizeof(double*));
     if (!a[i]) nrerror("allocation failure 2 in dmatrix()");
     a[i] -= ncl;
   }
 	
-  for(i=nrl;i<=nrh;++i) {
-    for(j=ncl;j<=nch;++j){
+  for(i=nrl;i<=nrh;i++) {
+    for(j=ncl;j<=nch;j++){
       a[i][j]=(double *) malloc((unsigned) (nthreeh-nthreel+1)*sizeof(double));
       if (!a[i][j]) nrerror("allocation failure 3 in dmatrix()");
       a[i][j] -= ncl;
@@ -197,7 +194,7 @@ int nrl,nrh,ncl,nch;
 	if (!m) nrerror("allocation failure 1 in imatrix()");
 	m -= nrl;
 
-	for(i=nrl;i<=nrh;++i) {
+	for(i=nrl;i<=nrh;i++) {
 		m[i]=(int *)malloc((unsigned) (nch-ncl+1)*sizeof(int));
 		if (!m[i]) nrerror("allocation failure 2 in imatrix()");
 		m[i] -= ncl;
@@ -331,7 +328,7 @@ int nrl,nrh,ncl,nch;
 /*  This function creates random numbers with a normal distribution */
 /*  And unit variance, just like matlab's randn		            */
 
-
+#include <math.h>
 
 double gasdevrand()
     
@@ -381,10 +378,7 @@ void catch_int(int sig_num)
 
 int main(int argc, char **argv) {
   /** Input/Output **/
-  
-  //int numThreads = 6;
-  //omp_set_num_threads(numThreads);
-  
+
   FILE *output1;
   FILE *input;
   char file_name[255],base[255];
@@ -417,7 +411,7 @@ int main(int argc, char **argv) {
     
   /** Iteration variables **/
 
-  double dt,C,s,tau,tmp,cmass,temp,ttmp,t,time,pl,maxdt,tmpcheck;
+  double dt,C,s,tau,tmp,cmass,temp,ttmp,t,time,pl,maxdt;
   double mindt,dtstep, ev, ed,dtone,gamo,onepluse;
   double ***dph,***dw,***dv,***du,***dT;
   int	n,nstart,Nf,i,j,k,m,savecount,numsnaps,tsnap,numsmooth,tsmooth;
@@ -548,9 +542,7 @@ junkvariable=(char *) malloc(1);
   /** decide how many timesteps to do. 	*/
   /* starts at n=nstart+1, goes to n=Nf  	*/
 
-  //Nf=10000000; number of iterations
-  Nf = atoi(argv[1]);
-  
+  Nf=10000000;
   nstart=1;
 
   /** define properties of the system **/
@@ -670,56 +662,27 @@ signal(SIGINT, catch_int);
   dz=h/(1.0*(Nz-1));
   dy=ggy*h/(1.0*(Ny-1));
   dx=ggx*h/(1.0*(Nx-1));
-
-//Change01 8/2/2016
- /*
-  #pragma omp parallel
-  {
-      #pragma omp sections
-	  {
-	    #pragma omp section
-		{
-		  for(k=1;k<=Nz;++k){
-			z[k]=dz*(k-1);}
-		}
-		#pragma omp section
-		{
-		  for(j=1;j<=Ny;++j){
-			y[j]=dy*(j-1);}
-		}
-		#pragma omp section
-		{
-		  for(i=1;i<=Nx;i++){
-			x[i]=dx*(i-1);}
-		}
-	  }	
-  }
- */
-//end change01
-for(k=1;k<=Nz;++k){
-	z[k]=dz*(k-1);} 
-for(j=1;j<=Ny;++j){
-	y[j]=dy*(j-1);}
-for(i=1;i<=Nx;++i){
-	x[i]=dx*(i-1);}
-
-
-
-
+  
+  for(k=1;k<=Nz;k++){
+    z[k]=dz*(k-1);}
+  for(j=1;j<=Ny;j++){
+    y[j]=dy*(j-1);}
+  for(i=1;i<=Nx;i++){
+    x[i]=dx*(i-1);}
 
   /*define initial conditions */
+  for(i=1;i<=Nx;i++){
+    for(j=1;j<=Ny;j++){
   
-  for(i=1;i<=Nx;++i){
-	for(j=1;j<=Ny;++j){
-	  /*
+      /*
 	temp=2.0*rand()/(1.0*RAND_MAX+1.0)-1.0;
 	ttmp=2.0*rand()/(1.0*RAND_MAX+1.0)-1.0;
-	  */
-	
-	  temp=gasdevrand();
-	  ttmp=gasdevrand();
-	
-	  for(k=1;k<=Nz;++k){
+      */
+    
+      temp=gasdevrand();
+      ttmp=gasdevrand();
+    
+      for(k=1;k<=Nz;k++){
 	tmp=(.99+.01*rand()/(1.0*RAND_MAX+1.0))*(1.0-tanh(z[k]-(1.07+mass+.8*temp)))/2.0;	
 	ph[i][j][k]=tmp*(.99+.01*rand()/(1.0*RAND_MAX+1.0))*(1.0-tanh((1.0+.8*ttmp)-z[k]))/2.0+ .000001;
 	
@@ -727,44 +690,38 @@ for(i=1;i<=Nx;++i){
 	/*	tmp=(1.0-tanh(z[k]-(1.07+mass+.8*temp)))/2.0;
 	ph[i][j][k]=tmp*(1.0-tanh((1.0+.8*ttmp)-z[k]))/2.0;
 	*/
-	  }
-	}
+      }
+    }
   }
-
 
   
   /*Now set the average layer depth to mass -- correct if neccessary	*/
-//start change02
+  
   
     cmass=0;
-	//#pragma omp parallel
-	//{
-	//#pragma omp for reduction(+:cmass)
-		for(i=1;i<=Nx;++i){  
-		  for(j=1;j<=Ny;++j){	
-		for(k=1;k<=Nz;++k){
-		  cmass = cmass + ph[i][j][k];
-		}
-		  }
-		}
+    for(i=1;i<=Nx;i++){  
+      for(j=1;j<=Ny;j++){	
+	for(k=1;k<=Nz;k++){
+	  cmass = cmass + ph[i][j][k];
+	}
+      }
+    }
     printf("%lf %lf %lf\n",dx,dz, dy);
     cmass=cmass*h/(1.0*Nx*Ny*Nz);
     printf("cmass %lf\n",cmass);
       
     temp=0.0;
-	//#pragma omp for reduction(+:temp)
-		for(i=1;i<=Nx;++i){
-		  for(j=1;j<=Ny;++j){
-		for(k=1;k<=Nz;++k){
-		  fph[i][j][k] = ph[i][j][k]*exp(-100.0*(ph[i][j][k]-numax*6.0/pi/2.0)*(ph[i][j][k]-numax*6.0/pi/2.0));
-		  temp=temp + fph[i][j][k];
-		}
-		  }
-		}
-	//}
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
+	  fph[i][j][k] = ph[i][j][k]*exp(-100.0*(ph[i][j][k]-numax*6.0/pi/2.0)*(ph[i][j][k]-numax*6.0/pi/2.0));
+	  temp=temp + fph[i][j][k];
+	}
+      }
+    }
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  ph[i][j][k]=ph[i][j][k] + fph[i][j][k]*(mass-cmass)/
 	    (h*temp/(1.0*Nx*Ny*Nz));
 	  if(ph[i][j][k]<0){
@@ -772,14 +729,11 @@ for(i=1;i<=Nx;++i){
 	}
       }
     }
-//end change02 
-
-//start change03
-  /*use values found above for density, and initialize u,v,w,t*/
-    //#pragma omp parallel for shared(u,v,w,T) private(i,j,k)
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+  
+  /*use values found above for density, and initialize v,w,t*/
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  u[i][j][k]=0.0;
 	  v[i][j][k]=0.0;
 	  w[i][j][k]=-.3;
@@ -787,7 +741,6 @@ for(i=1;i<=Nx;++i){
 	}
       }
     }
-//end change03
   /*initial time is one quarter period before t=0*/
   
   t=((acos(0.0)+pi)-2.0*pi)/2.0/pi/f;
@@ -796,8 +749,8 @@ for(i=1;i<=Nx;++i){
   
   /*find values for G, P, etc (not really necessary */
   /*
-  for(j=1;j<=Ny;++j){
-    for(k=1;k<=Nz;++k){
+  for(j=1;j<=Ny;j++){
+    for(k=1;k<=Nz;k++){
     nu=pi/6.0*ph[j][k];
     G[j][k]=nu/(1.0-pow(nu/numax,4.0*numax/3.0));
     P[j][k]=(1.0+2.0*onepluse*G[j][k])*T[j][k]*ph[j][k];
@@ -871,40 +824,40 @@ for(i=1;i<=Nx;++i){
     
 
     
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  fread(&ph[i][j][k],sizeof(double),1,input);
 	}
       }
     }    
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	fread(&u[i][j][k],sizeof(double),1,input);
 	}
       }
     }
 
-   for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-        for(k=1;k<=Nz;++k){
+   for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+        for(k=1;k<=Nz;k++){
           fread(&v[i][j][k],sizeof(double),1,input);
         }
       }
     }
     
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-        for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+        for(k=1;k<=Nz;k++){
           fread(&w[i][j][k],sizeof(double),1,input);
         }
       }
     }
 
-    for(i=1;i<=Nx;++i){    
-      for(j=1;j<=Ny;++j){
-        for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){    
+      for(j=1;j<=Ny;j++){
+        for(k=1;k<=Nz;k++){
           fread(&T[i][j][k],sizeof(double),1,input);
         }
       }
@@ -921,9 +874,9 @@ for(i=1;i<=Nx;++i){
   /*smooth out initial conditions from 1 to presmooth */
   
   for(n=1;n<=presmooth;n++){
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=2;k<=Nz-1;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=2;k<=Nz-1;k++){
 	  fph[i][j][k]=(.5*ph[i][j][k-1] + ph[i][j][k] + .5*ph[i][j][k+1])/2.0;
 	  fu[i][j][k]=(.5*u[i][j][k-1] + u[i][j][k] + .5*u[i][j][k+1])/2.0;
 	  fv[i][j][k]=(.5*v[i][j][k-1] + v[i][j][k] + .5*v[i][j][k+1])/2.0;
@@ -949,9 +902,9 @@ for(i=1;i<=Nx;++i){
       }
     }
 
-    for(i=1;i<=Nx;++i){
-      for(k=1;k<=Nz;++k){
-	for(j=2;j<Ny;++j){
+    for(i=1;i<=Nx;i++){
+      for(k=1;k<=Nz;k++){
+	for(j=2;j<Ny;j++){
 	  fph[i][j][k]=(.1*fph[i][j-1][k] + fph[i][j][k]
 		       + .1*fph[i][j+1][k])/1.2;
 	  fu[i][j][k]=(.1*fu[i][j-1][k] + fu[i][j][k] + .1*fu[i][j+1][k])/1.2;
@@ -974,9 +927,9 @@ for(i=1;i<=Nx;++i){
       }
     }
   
-    for(j=1;j<=Ny;++j){
-      for(k=1;k<=Nz;++k){
-	for(i=2;i<Nx;++i){
+    for(j=1;j<=Ny;j++){
+      for(k=1;k<=Nz;k++){
+	for(i=2;i<Nx;i++){
 	  ph[i][j][k]=(.1*fph[i-1][j][k] + fph[i][j][k] +
 		       .1*fph[i+1][j][k])/1.2;
 	  u[i][j][k]=(.1*fu[i-1][j][k] + fu[i][j][k] + .1*fu[i+1][j][k])/1.2;
@@ -1010,31 +963,24 @@ for(i=1;i<=Nx;++i){
   else{
     tsnap=floor(time*numsnaps);} /*set tsnap so there is no save on 1st step*/
   /* now start timestepping */
-  
-  n=nstart+1;
+  Nf=atoi(argv[1]);
+  n=nstart-1;
   //while(checkforsignaltoend==1){
-  for(n=nstart;n<=Nf;++n){
-    //n++; 
+  while(n<Nf){  
+    /*  for(n=nstart+1;n<=Nf;n++){*/
+    n++;
+    
       /* find plate position */
-      //comment printf("%d \n", n);
+    
       pl=A*(1.0-cos(2.0*pi*time));
     
-    
-    /** Make sure T is nonnegative everywhere 	**/
-    /** And check for conservation of mass, so	**/
-    /** that avg layer deth is mass		**/    
-      cmass=0.0;
-      tsmooth=0;
       /*Use superviscosity for low density regions	*/
       /*Smooth to prevent blowups in regions where */
       /*there are physically no particles		*/
-	  
-      #pragma omp parallel private(temp)
-      {
-      #pragma omp for
-      for(i=1;i<=Nx;++i){	
-	for(j=1;j<=Ny;++j){
-	  for(k=2;k<Nz;++k){  
+
+      for(i=1;i<=Nx;i++){	
+	for(j=1;j<=Ny;j++){
+	  for(k=2;k<Nz;k++){  
 	    fu[i][j][k]=(u[i][j][k-1] + u[i][j][k] + u[i][j][k+1])/3.0;
 	    fv[i][j][k]=(v[i][j][k-1] + v[i][j][k] + v[i][j][k+1])/3.0;
 	    fw[i][j][k]=(w[i][j][k-1] + w[i][j][k] + w[i][j][k+1])/3.0;
@@ -1053,10 +999,10 @@ for(i=1;i<=Nx;++i){
 	
 	}
       }
-      #pragma omp for
-      for(i=1;i<=Nx;++i){      
-	for(k=1;k<=Nz;++k){
-	  for(j=2;j<Ny;++j){
+
+      for(i=1;i<=Nx;i++){      
+	for(k=1;k<=Nz;k++){
+	  for(j=2;j<Ny;j++){
 	    fu[i][j][k]=(fu[i][j-1][k] + fu[i][j][k] + fu[i][j+1][k])/3.0;
 	    fv[i][j][k]=(fv[i][j-1][k] + fv[i][j][k] + fv[i][j+1][k])/3.0;
 	    fw[i][j][k]=(fw[i][j-1][k] + fw[i][j][k] + fw[i][j+1][k])/3.0;
@@ -1073,10 +1019,10 @@ for(i=1;i<=Nx;++i){
 	  fT[i][Ny][k]=(fT[i][Ny-1][k] + fT[i][Ny][k] + fT[i][1][k])/3.0;
 	}
       }
-    #pragma omp for
-    for(k=1;k<=Nz;++k){
-	for(j=1;j<=Ny;++j){
-	  for(i=2;i<Nx;++i){
+
+    for(k=1;k<=Nz;k++){
+	for(j=1;j<=Ny;j++){
+	  for(i=2;i<Nx;i++){
 	    fu[i][j][k]=(fu[i-1][j][k] + fu[i][j][k] + fu[i+1][j][k])/3.0;
 	    fv[i][j][k]=(fv[i-1][j][k] + fv[i][j][k] + fv[i+1][j][k])/3.0;
 	    fw[i][j][k]=(fw[i-1][j][k] + fw[i][j][k] + fw[i+1][j][k])/3.0;
@@ -1098,11 +1044,10 @@ for(i=1;i<=Nx;++i){
     }
 
      
-    //#pragma omp parallel for shared(fu,fv,fw,fT,u,v,w,T,ph) private(i,j,k) num_threads(numThreads)
-    #pragma omp for
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+      
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  temp=exp(-ph[i][j][k]*supervis);
 	  u[i][j][k]=temp*fu[i][j][k] + (1.0-temp)*u[i][j][k];
 	  v[i][j][k]=temp*fv[i][j][k] + (1.0-temp)*v[i][j][k];
@@ -1111,12 +1056,19 @@ for(i=1;i<=Nx;++i){
 	}
       }
     }
-      
-      }
-    //#pragma omp for reduction(+:tsmooth,cmass) //revisit this to parallelize
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+
+    printf("%d \n", n);
+
+    /** Make sure T is nonnegative everywhere 	**/
+    /** And check for conservation of mass, so	**/
+    /** that avg layer deth is mass		**/
+    
+           
+    cmass=0.0;
+    tsmooth=0;
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  if(T[i][j][k]<0.0){
 	    printf("negative T");
 	    tsmooth+=1;
@@ -1126,22 +1078,12 @@ for(i=1;i<=Nx;++i){
 	}
       }
     }
-
-
-    //come back to this so that this can be parallelized
     cmass=cmass*h/(1.0*Nx*Ny*Nz);
     
-    //comment printf("cmass %lf\n", cmass);
-    
     temp=0.0;
-
-
-#pragma omp parallel default(shared) private(nu,tone,ev,ed) //had difficulty here due to the shared variables
-{
-    #pragma omp for reduction(+:temp)
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  fph[i][j][k] = ph[i][j][k] *
 	    exp(-100.0*(ph[i][j][k]-numax*6.0/pi/2.0) *
 		(ph[i][j][k]-numax*6.0/pi/2.0));
@@ -1149,26 +1091,21 @@ for(i=1;i<=Nx;++i){
 	}
       }
     }
-
-    #pragma omp for
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  ph[i][j][k]=ph[i][j][k]
 	    +fph[i][j][k]*(mass-cmass)/(h*temp/(Nx*Ny*Nz));
 	}
       }
     }
 
-
-
-
-
+    printf("cmass %lf\n", cmass);
+    
 
     /** Now set boundary conditions		**/
-    #pragma omp for 
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
 	w[i][j][1]=0.0;			/* impenetrable walls 	*/
 	w[i][j][Nz]=0.0;		/* impenetrable walls	*/
 
@@ -1195,18 +1132,17 @@ for(i=1;i<=Nx;++i){
 	T[i][j][Nz]=0.0;}
       }
     }
-
+    
 
     /*******  Now calculate variables for iteration of equations ****/
 
     /******* Calculate first derivatives of the flow variables ***/
-
-
+     
     /*First in x */
-    #pragma omp for  
-    for(k=1;k<=Nz;++k){
-      for(j=1;j<=Ny;++j){
-	for(i=2;i<Nx;++i){
+      
+    for(k=1;k<=Nz;k++){
+      for(j=1;j<=Ny;j++){
+	for(i=2;i<Nx;i++){
 	  phx[i][j][k]=(ph[i+1][j][k]-ph[i-1][j][k])/(2.0 * dx);
 	  ux[i][j][k]=(u[i+1][j][k]-u[i-1][j][k])/(2.0 * dx);
 	  vx[i][j][k]=(v[i+1][j][k]-v[i-1][j][k])/(2.0 * dx);
@@ -1230,14 +1166,12 @@ for(i=1;i<=Nx;++i){
       }
 
     }
-    
-
     /*Then in y */
 
-    #pragma omp for
-    for(i=1;i<=Nx;++i){
-      for(k=1;k<=Nz;++k){
-	for(j=2;j<Ny;++j){
+     
+    for(i=1;i<=Nx;i++){
+      for(k=1;k<=Nz;k++){
+	for(j=2;j<Ny;j++){
 	  phy[i][j][k]=(ph[i][j+1][k]-ph[i][j-1][k])/(2.0 * dy);
 	  uy[i][j][k]=(u[i][j+1][k]-u[i][j-1][k])/(2.0 * dy);
 	  vy[i][j][k]=(v[i][j+1][k]-v[i][j-1][k])/(2.0 * dy);
@@ -1263,10 +1197,9 @@ for(i=1;i<=Nx;++i){
 	
 
      /* finally in z */
-    #pragma omp for 
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){      
-	for(k=2;k<Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){      
+	for(k=2;k<Nz;k++){
 	  phz[i][j][k]=(ph[i][j][k+1]-ph[i][j][k-1])/(2.0*dz);
 	  uz[i][j][k]=(u[i][j][k+1]-u[i][j][k-1])/(2.0*dz);
 	  vz[i][j][k]=(v[i][j][k+1]-v[i][j][k-1])/(2.0*dz);
@@ -1301,13 +1234,17 @@ for(i=1;i<=Nx;++i){
       }
     }
 
+
     
     /**** Now calculate combinations of the variables and derivatives****/
 
-    #pragma omp for 
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
+
+
+    
     /**** First calculate transport coefficients *******/
 
 
@@ -1329,7 +1266,7 @@ for(i=1;i<=Nx;++i){
 	  gam[i][j][k] = ed*G[i][j][k]*T[i][j][k]*tone; 
 
 
-	  /**now the components of the stress tensor**/        
+	  /**now the components of the stress tensor**/
 
 	  divU[i][j][k]=ux[i][j][k]+wz[i][j][k]+vy[i][j][k];
 	  stressxx[i][j][k] = 2.0*mu[i][j][k]*ux[i][j][k] + 
@@ -1359,18 +1296,16 @@ for(i=1;i<=Nx;++i){
 	}
       }
     }
-  
-//end change05
+
   
  
     /* and higher order derivatives and combinations */
-//start change06
+
     /* first x derivatives */
 
-    #pragma omp for
-    for(j=1;j<=Ny;++j){
-      for(k=1;k<=Nz;++k){
-	for(i=2;i<Nx;++i){
+    for(j=1;j<=Ny;j++){
+      for(k=1;k<=Nz;k++){
+	for(i=2;i<Nx;i++){
 	  divflux[i][j][k]=(heatfluxx[i+1][j][k]-
 			      heatfluxx[i-1][j][k])/(2.0*dx);
 	  stressxxDx[i][j][k]=(stressxx[i+1][j][k]-
@@ -1380,6 +1315,7 @@ for(i=1;i<=Nx;++i){
 	  stressxyDx[i][j][k]=(stressxy[i+1][j][k]-
 			   stressxy[i-1][j][k])/(2.0*dx);
 	}
+
 	divflux[1][j][k]=(heatfluxx[2][j][k] -
 			    heatfluxx[Nx][j][k])/(2.0*dx);
 	stressxxDx[1][j][k]=(stressxx[2][j][k] -
@@ -1400,13 +1336,11 @@ for(i=1;i<=Nx;++i){
 	
       }
     }
-
     /* now y derivatives */
     
-    #pragma omp for
-    for(i=1;i<=Nx;++i){
-      for(k=1;k<=Nz;++k){
-	for(j=2;j<Ny;++j){
+    for(i=1;i<=Nx;i++){
+      for(k=1;k<=Nz;k++){
+	for(j=2;j<Ny;j++){
 	  divflux[i][j][k] += (heatfluxy[i][j+1][k]
 				 -heatfluxy[i][j-1][k])/(2.0 * dy);
 	  stressyyDy[i][j][k]=(stressyy[i][j+1][k] - 
@@ -1435,11 +1369,10 @@ for(i=1;i<=Nx;++i){
     }
 
       /* then z derivatives */
-	
-    #pragma omp for
-    for(i=1;i<=Nx;++i){    
-      for(j=1;j<=Ny;++j){
-	for(k=2;k<Nz;++k){
+
+    for(i=1;i<=Nx;i++){    
+      for(j=1;j<=Ny;j++){
+	for(k=2;k<Nz;k++){
 	  divflux[i][j][k] +=
 	    (heatfluxz[i][j][k+1]-heatfluxz[i][j][k-1])/
 	    (2.0*dz);
@@ -1492,13 +1425,11 @@ for(i=1;i<=Nx;++i){
 
       }
     }
-
-
+    
     /********* Finally, calculate dph, dv, dw, dT *****************/
-    #pragma omp for
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  dph[i][j][k] = -(u[i][j][k] * phx[i][j][k] +
 			   v[i][j][k] * phy[i][j][k] +
 			   w[i][j][k] * phz[i][j][k] +
@@ -1517,16 +1448,16 @@ for(i=1;i<=Nx;++i){
 	  du[i][j][k]=
 	    -u[i][j][k]*ux[i][j][k]
 	    -v[i][j][k]*uy[i][j][k]
-	    -w[i][j][k]*uz[i][j][k]         
+	    -w[i][j][k]*uz[i][j][k]
 	    + (-Px[i][j][k] +
 	       stressxxDx[i][j][k] +
 	       stressxyDy[i][j][k] +
-	       stressxzDz[i][j][k])/ph[i][j][k];             
+	       stressxzDz[i][j][k])/ph[i][j][k]; 
 	       
 	    
 	  dv[i][j][k] =
 	    -u[i][j][k]*vx[i][j][k]
-	    -v[i][j][k]*vy[i][j][k]                   
+	    -v[i][j][k]*vy[i][j][k]
 	    -w[i][j][k]*vz[i][j][k]
 	    + (-Py[i][j][k]+
 	       stressyyDy[i][j][k]+
@@ -1549,14 +1480,13 @@ for(i=1;i<=Nx;++i){
 	}
       }
     }
-}
-//}
+
     
       /* Write data to file */
    
     /*    if(n%1000==2){	*/
     
-    // comment printf("%lf\n",t*f*numsnaps-tsnap); 
+    printf("%lf\n",t*f*numsnaps-tsnap);
     
     /*if time elapsed since last save is >=1/numsnaps, then save*/
 
@@ -1613,42 +1543,42 @@ for(i=1;i<=Nx;++i){
     */
 
     
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	 fwrite(&ph[i][j][k],sizeof(double),1,output1); 
 	}
       }
     }
     
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  fwrite(&u[i][j][k],sizeof(double),1,output1); 
 	}
       }
     }
     
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  fwrite(&v[i][j][k],sizeof(double),1,output1); 
 	}
       }
     }
     
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  fwrite(&w[i][j][k],sizeof(double),1,output1); 
 	}
       }
     }
 
   
-    for(i=1;i<=Nx;++i){    
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){    
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  fwrite(&T[i][j][k],sizeof(double),1,output1);
 	}
       }
@@ -1674,9 +1604,9 @@ for(i=1;i<=Nx;++i){
 
       numsmooth+=1; /*counts the number of times smoothing happens during run*/
       
-      for(i=1;i<=Nx;++i){
-	for(j=1;j<=Ny;++j){
-	  for(k=2;k<Nz;++k){
+      for(i=1;i<=Nx;i++){
+	for(j=1;j<=Ny;j++){
+	  for(k=2;k<Nz;k++){
 	    fph[i][j][k]=(.5*ph[i][j][k-1] + ph[i][j][k] +
 			  .5*ph[i][j][k+1])/2.0;
 	    fu[i][j][k]=(.5*u[i][j][k-1] + u[i][j][k] +
@@ -1704,9 +1634,9 @@ for(i=1;i<=Nx;++i){
 	}
       }
     
-    for(i=1;i<=Nx;++i){
-      for(k=1;k<=Nz;++k){
-	for(j=2;j<Ny;++j){
+    for(i=1;i<=Nx;i++){
+      for(k=1;k<=Nz;k++){
+	for(j=2;j<Ny;j++){
 	  fph[i][j][k]=(.01*fph[i][j-1][k] + fph[i][j][k] +
 		       .01*fph[i][j+1][k])/1.02;
 	  fu[i][j][k]=(.01*fu[i][j-1][k] + fu[i][j][k] +
@@ -1743,9 +1673,9 @@ for(i=1;i<=Nx;++i){
       }
     }
 
-    for(j=1;j<=Ny;++j){
-      for(k=1;k<=Nz;++k){
-	for(i=2;i<Nx;++i){
+    for(j=1;j<=Ny;j++){
+      for(k=1;k<=Nz;k++){
+	for(i=2;i<Nx;i++){
 	  
 	  ph[i][j][k]=(.01*fph[i-1][j][k] + fph[i][j][k] +
 		       .01*fph[i+1][j][k])/1.02;
@@ -1798,30 +1728,24 @@ for(i=1;i<=Nx;++i){
     }
     
     tmp=0.0;
-    tmpcheck=0.0;
-    //#pragma omp parallel private(dtone,dt) //try to parallelize later
-    
-    //#pragma omp for reduction(max:tmp)     
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
-        tmpcheck=ph[i][j][k];
-	  if(K[i][j][k]/tmpcheck>tmp){
-	    tmp=K[i][j][k]/tmpcheck;}
-	  if(lam[i][j][k]/tmpcheck>tmp){
-	    tmp=lam[i][j][k]/tmpcheck;}
-	  if(mu[i][j][k]/tmpcheck>tmp){
-	    tmp=mu[i][j][k]/tmpcheck;}
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
+	  if(K[i][j][k]/ph[i][j][k]>tmp){
+	    tmp=K[i][j][k]/ph[i][j][k];}
+	  if(lam[i][j][k]/ph[i][j][k]>tmp){
+	    tmp=lam[i][j][k]/ph[i][j][k];}
+	  if(mu[i][j][k]/ph[i][j][k]>tmp){
+	    tmp=mu[i][j][k]/ph[i][j][k];}
 	}
       }
     }
     dtone=s * temp * temp / tmp;
 
     tmp=0.0;
-    //#pragma omp for reduction(max:tmp)
-    for(i=1;i<=Nx;++i){
-      for(j=1;j<=Ny;++j){
-	for(k=1;k<=Nz;++k){
+    for(i=1;i<=Nx;i++){
+      for(j=1;j<=Ny;j++){
+	for(k=1;k<=Nz;k++){
 	  if(fabs(w[i][j][k])>tmp){
 	    tmp=fabs(w[i][j][k]);}
 	  if(fabs(v[i][j][k])>tmp){
@@ -1836,10 +1760,9 @@ for(i=1;i<=Nx;++i){
        dtone=C*temp/tmp;}
 
      tmp=0.0;
-     //#pragma omp for reduction(max:tmp)
-     for(i=1;i<=Nx;++i){
-       for(j=1;j<=Ny;++j){
-	 for(k=1;k<=Nz;++k){
+     for(i=1;i<=Nx;i++){
+       for(j=1;j<=Ny;j++){
+	 for(k=1;k<=Nz;k++){
 	   if(G[i][j][k]*sqrt(T[i][j][k])>tmp){
 	     tmp=(G[i][j][k]*sqrt(T[i][j][k]));}
 	 }
@@ -1859,10 +1782,10 @@ for(i=1;i<=Nx;++i){
 
        if(dt>maxdt){
 	 dt=maxdt;}
-       //#pragma omp for
-       for(i=1;i<=Nx;++i){
-	 for(j=1;j<=Ny;++j){
-	   for(k=1;k<=Nz;++k){
+       
+       for(i=1;i<=Nx;i++){
+	 for(j=1;j<=Ny;j++){
+	   for(k=1;k<=Nz;k++){
 	     ph[i][j][k]=ph[i][j][k]+dph[i][j][k]*dt;
 	     u[i][j][k]=u[i][j][k]+du[i][j][k]*dt;
 	     v[i][j][k]=v[i][j][k]+dv[i][j][k]*dt;
@@ -1873,17 +1796,12 @@ for(i=1;i<=Nx;++i){
 	   }	
 	 }
        }
-    
        t=t+dt;
        time=t*f;
     /*********************END TIMESTEPPING ****************/
 
        
   }
-  //time_t end;
-  //end=time(NULL);
-  //double tottime=(double)(end-start);
-  //printf("Time elapsed: %.2f\n",tottime);
 
   printf("freeing memory\n");
        
